@@ -72,16 +72,9 @@ const SOURCES = [
       "https://mogi.vn/ha-noi/mua-can-ho-chung-cu",
       "https://mogi.vn/ha-noi/mua-can-ho-chung-cu?cp=2",
       "https://mogi.vn/ha-noi/mua-nha",
-      "https://mogi.vn/ha-noi/mua-dat"
-    ]
-  },
-  {
-    id: "homedy-hanoi",
-    name: "Homedy",
-    type: "homedy",
-    urls: [
-      "https://homedy.com/sitemap/detail-{today}.xml",
-      "https://homedy.com/sitemap/detail-{yesterday}.xml"
+      "https://mogi.vn/ha-noi/mua-nha?cp=2",
+      "https://mogi.vn/ha-noi/mua-dat",
+      "https://mogi.vn/ha-noi/mua-dat?cp=2"
     ]
   },
   {
@@ -90,8 +83,11 @@ const SOURCES = [
     type: "nhatot",
     urls: [
       "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&region_v2=12000&limit=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&region_v2=12000&limit=20&o=20",
       "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&region_v2=12000&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&region_v2=12000&limit=20"
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&region_v2=12000&limit=20&o=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&region_v2=12000&limit=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&region_v2=12000&limit=20&o=20"
     ]
   }
 ];
@@ -392,47 +388,6 @@ function parseBatdongsan(html, source) {
   return [...byId.values()];
 }
 
-function parseHomedy(xml, source) {
-  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/gi)]
-    .map((m) => m[1].trim())
-    .filter((u) => /ha-noi.*es\d+$/i.test(u));
-
-  return Promise.all(urls.map(async (url) => {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-        }
-      });
-      if (!res.ok) return null;
-      const html = await res.text();
-      if (html.includes("error/404")) return null;
-      const title = normalizeText(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || "");
-      const desc = normalizeText(html.match(/<div[^>]*class=['"][^'"]*description readmore[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)?.[1] || "");
-      const combined = `${title} ${desc} ${url}`;
-      const images = extractImageUrls(html.match(/<div[^>]*class=['"][^'"]*gallery[^'"]*['"][\s\S]*?<\/div>/i)?.[0] || "", "https://homedy.com");
-      return {
-        id: createHash("sha1").update(url).digest("hex"),
-        title,
-        url,
-        summary: desc || title,
-        district: inferDistrict(combined),
-        price: extractPrice(combined),
-        area: extractArea(combined),
-        image: images[0] || "",
-        images,
-        sourceId: source.id,
-        sourceName: source.name,
-        publishedAt: null,
-        firstSeenAt: new Date().toISOString(),
-        lastSeenAt: new Date().toISOString()
-      };
-    } catch { return null; }
-  })).then((results) => results.filter((l) => l && l.title && isRelevantListing(l)));
-}
-
 async function parseMogi(html, source) {
   const blocks = [...html.matchAll(/<div[^>]*class=['"][^'"]*prop-info['"][^>]*>[\s\S]*?<\/div>\s*<\/div>/gi)];
   const listings = blocks.map((match) => {
@@ -709,10 +664,7 @@ async function scanListings() {
   const debugLog = [];
 
   for (const source of SOURCES) {
-    const rawUrls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10).replace(/-/g, "");
-    const urls = rawUrls.map((u) => u.replace("{today}", today).replace("{yesterday}", yesterday));
+    const urls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
     for (const url of urls) {
       try {
         debugLog.push(`[${source.id}] Scanning: ${url}`);
@@ -736,9 +688,6 @@ async function scanListings() {
         if (source.type === "mogi") {
           headers.referer = "https://mogi.vn/";
         }
-        if (source.type === "homedy") {
-          headers.accept = "application/xml, text/xml, */*;q=0.8";
-        }
         const response = await fetch(url, {
           headers
         });
@@ -753,8 +702,6 @@ async function scanListings() {
           sourcedListings = await parseAlonhadat(body, source);
         } else if (source.type === "mogi") {
           sourcedListings = await parseMogi(body, source);
-        } else if (source.type === "homedy") {
-          sourcedListings = await parseHomedy(body, source);
         } else if (source.type === "nhatot") {
           sourcedListings = parseNhatot(body, source);
         } else {
@@ -794,7 +741,7 @@ async function scanListings() {
   });
   
   debugLog.push(`[FILTER] After filter: ${listings.length} listings`);
-  debugLog.push(`[SOURCES] Mogi: ${listings.filter(l => l.sourceId === 'mogi-hanoi').length}, Homedy: ${listings.filter(l => l.sourceId === 'homedy-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
+  debugLog.push(`[SOURCES] Mogi: ${listings.filter(l => l.sourceId === 'mogi-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
 
   db.listings = listings.slice(0, 2000);
   db.runs = [
