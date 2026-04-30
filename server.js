@@ -9,7 +9,6 @@ const ROOT = resolve(".");
 const PUBLIC_DIR = join(ROOT, "public");
 const DATA_DIR = join(ROOT, "data");
 const DB_PATH = join(DATA_DIR, "listings.json");
-const SCAN_EVERY_MS = 60 * 60 * 1000;
 
 const PROVINCES = [
   "Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
@@ -37,45 +36,70 @@ const MIME_TYPES = new Map([
   [".svg", "image/svg+xml"]
 ]);
 
-const SOURCES = [
-  {
-    id: "alonhadat",
-    name: "Alonhadat",
-    type: "alonhadat",
-    urls: [
+const PROVINCE_SLUGS = {
+  "Hà Nội": { alonhadat: "ha-noi", mogi: "ha-noi", nhatot: 12000 },
+  "Hồ Chí Minh": { alonhadat: "ho-chi-minh", mogi: "ho-chi-minh", nhatot: 13000 },
+  "Đà Nẵng": { alonhadat: "da-nang", mogi: "da-nang", nhatot: null },
+  "Hải Phòng": { alonhadat: "hai-phong", mogi: "hai-phong", nhatot: null },
+  "Cần Thơ": { alonhadat: "can-tho", mogi: "can-tho", nhatot: null },
+  "Bình Dương": { alonhadat: "binh-duong", mogi: "binh-duong", nhatot: null },
+  "Đồng Nai": { alonhadat: "dong-nai", mogi: "dong-nai", nhatot: null },
+  "Khánh Hòa": { alonhadat: "khanh-hoa", mogi: "khanh-hoa", nhatot: null },
+  "Bắc Ninh": { alonhadat: "bac-ninh", mogi: "bac-ninh", nhatot: null },
+  "Quảng Ninh": { alonhadat: "quang-ninh", mogi: "quang-ninh", nhatot: null },
+  "Thanh Hóa": { alonhadat: "thanh-hoa", mogi: "thanh-hoa", nhatot: null },
+  "Nghệ An": { alonhadat: "nghe-an", mogi: "nghe-an", nhatot: null },
+  "Lâm Đồng": { alonhadat: "lam-dong", mogi: "lam-dong", nhatot: null },
+  "Thừa Thiên Huế": { alonhadat: "thua-thien-hue", mogi: "thua-thien-hue", nhatot: null },
+  "Bà Rịa - Vũng Tàu": { alonhadat: "ba-ria-vung-tau", mogi: "ba-ria-vung-tau", nhatot: null },
+};
+
+function buildSourceUrls(province) {
+  const slugs = PROVINCE_SLUGS[province];
+  const sources = [];
+
+  if (slugs?.alonhadat) {
+    const s = slugs.alonhadat;
+    sources.push({ id: "alonhadat", name: "Alonhadat", type: "alonhadat", urls: [
+      `https://alonhadat.com.vn/can-ban-can-ho-chung-cu/${s}`,
+      `https://alonhadat.com.vn/can-ban-can-ho-chung-cu/${s}/trang-2`,
+      `https://alonhadat.com.vn/can-ban-nha/${s}`,
+      `https://alonhadat.com.vn/can-ban-dat/${s}`,
+    ]});
+  } else {
+    sources.push({ id: "alonhadat", name: "Alonhadat", type: "alonhadat", urls: [
       "https://alonhadat.com.vn/can-ban-can-ho-chung-cu",
-      "https://alonhadat.com.vn/can-ban-can-ho-chung-cu/trang-2",
       "https://alonhadat.com.vn/can-ban-nha",
-      "https://alonhadat.com.vn/can-ban-dat"
-    ]
-  },
-  {
-    id: "mogi",
-    name: "Mogi.vn",
-    type: "mogi",
-    urls: [
-      "https://mogi.vn/mua-can-ho-chung-cu",
-      "https://mogi.vn/mua-can-ho-chung-cu?cp=2",
-      "https://mogi.vn/mua-nha",
-      "https://mogi.vn/mua-nha?cp=2",
-      "https://mogi.vn/mua-dat",
-      "https://mogi.vn/mua-dat?cp=2"
-    ]
-  },
-  {
-    id: "nhatot",
-    name: "Nhà Tốt",
-    type: "nhatot",
-    urls: [
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&limit=20&o=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&limit=20&o=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&limit=20&o=20"
-    ]
+      "https://alonhadat.com.vn/can-ban-dat",
+    ]});
   }
-];
+
+  if (slugs?.mogi) {
+    const s = slugs.mogi;
+    sources.push({ id: "mogi", name: "Mogi.vn", type: "mogi", urls: [
+      `https://mogi.vn/${s}/mua-can-ho-chung-cu`,
+      `https://mogi.vn/${s}/mua-can-ho-chung-cu?cp=2`,
+      `https://mogi.vn/${s}/mua-nha`,
+      `https://mogi.vn/${s}/mua-dat`,
+    ]});
+  } else {
+    sources.push({ id: "mogi", name: "Mogi.vn", type: "mogi", urls: [
+      "https://mogi.vn/mua-can-ho-chung-cu",
+      "https://mogi.vn/mua-nha",
+      "https://mogi.vn/mua-dat",
+    ]});
+  }
+
+  const regionParam = slugs?.nhatot ? `&region_v2=${slugs.nhatot}` : "";
+  sources.push({ id: "nhatot", name: "Nhà Tốt", type: "nhatot", urls: [
+    `https://gateway.chotot.com/v1/public/ad-listing?cg=1010${regionParam}&limit=20`,
+    `https://gateway.chotot.com/v1/public/ad-listing?cg=1010${regionParam}&limit=20&o=20`,
+    `https://gateway.chotot.com/v1/public/ad-listing?cg=1020${regionParam}&limit=20`,
+    `https://gateway.chotot.com/v1/public/ad-listing?cg=1040${regionParam}&limit=20`,
+  ]});
+
+  return sources;
+}
 
 function ensureDatabase() {
   mkdirSync(DATA_DIR, { recursive: true });
@@ -249,6 +273,13 @@ function inferProvince(text) {
   return PROVINCES.find((p) => folded.includes(foldText(p))) || "Khác";
 }
 
+const SUB_DISTRICT_RE = /(?:quận|huyện|thị xã|thành phố|tx\.|tp\.)\s+([^\s,.\-–]+(?:\s+[^\s,.\-–]+){0,3})/gi;
+
+function inferSubDistrict(text) {
+  const matches = [...text.matchAll(SUB_DISTRICT_RE)];
+  return matches.length ? normalizeText(matches[0][0]) : "";
+}
+
 function parseRss(xml, source, district) {
   const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((match) => match[0]);
   return items.map((item) => {
@@ -264,6 +295,7 @@ function parseRss(xml, source, district) {
       url,
       summary,
       district,
+      subDistrict: inferSubDistrict(`${title} ${summary}`),
       price: extractPrice(combined),
       area: extractArea(combined),
       image: "",
@@ -303,6 +335,7 @@ async function parseAlonhadat(html, source) {
       url,
       summary,
       district: inferProvince(`${title} ${summary} ${address}`),
+      subDistrict: inferSubDistrict(`${title} ${summary} ${address}`),
       price: price || extractPrice(`${title} ${summary}`),
       area: area || extractArea(`${title} ${summary}`),
       image,
@@ -403,6 +436,7 @@ async function parseMogi(html, source) {
       url,
       summary: address,
       district: inferProvince(combined),
+      subDistrict: inferSubDistrict(combined),
       price: price || extractPrice(combined),
       area: area || extractArea(combined),
       image: images[0] || "",
@@ -456,6 +490,7 @@ function parseNhatot(jsonText, source) {
       url,
       summary,
       district: inferProvince(combined),
+      subDistrict: normalizeText(ad.area_name || "") || inferSubDistrict(combined),
       price: normalizeText(ad.price_string || formatNhatotPrice(ad.price)),
       area: ad.size ? `${String(ad.size).replace(".", ",")} m2` : extractArea(combined),
       image: images[0] || "",
@@ -541,6 +576,7 @@ function collectBatdongsanItems(value, listings, source) {
         url,
         summary,
         district: inferProvince(combined),
+        subDistrict: inferSubDistrict(combined),
         price: extractPrice(combined),
         area: extractArea(combined),
         image: normalizeImages(candidate.image)[0] || "",
@@ -597,6 +633,7 @@ function parseBatdongsanAnchors(html, source) {
       url,
       summary,
       district: inferProvince(title),
+      subDistrict: inferSubDistrict(title),
       price: extractPrice(anchor.text),
       area: extractArea(anchor.text),
       image: anchor.images[0] || "",
@@ -651,14 +688,15 @@ function extractArea(text) {
   return match ? `${match[1].replace(".", ",")} m2` : "";
 }
 
-async function scanListings() {
+async function scanListings(province) {
   const startedAt = new Date().toISOString();
   const found = [];
   const errors = [];
   const debugLog = [];
+  const sources = buildSourceUrls(province || "Hà Nội");
 
-  for (const source of SOURCES) {
-    const urls = source.urls || PROVINCES.map((p) => source.buildUrl(p));
+  for (const source of sources) {
+    const urls = source.urls;
     for (const url of urls) {
       try {
         debugLog.push(`[${source.id}] Scanning: ${url}`);
@@ -728,7 +766,7 @@ async function scanListings() {
     }
   }
 
-  const activeSourceIds = new Set(SOURCES.map((s) => s.id));
+  const activeSourceIds = new Set(sources.map((s) => s.id));
 
   const listings = [...byId.values()].filter((l) => activeSourceIds.has(l.sourceId) && isRelevantListing(l)).sort((a, b) => {
     return new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime();
@@ -759,22 +797,27 @@ async function scanListings() {
 function filterListings(requestUrl) {
   const db = readDatabase();
   const province = requestUrl.searchParams.get("province") || "";
+  const sub = requestUrl.searchParams.get("sub") || "";
   const query = (requestUrl.searchParams.get("q") || "").toLowerCase();
 
   let listings = db.listings;
-  if (province) listings = listings.filter((listing) => listing.district === province);
+  if (province) listings = listings.filter((l) => l.district === province);
+  if (sub) listings = listings.filter((l) => l.subDistrict === sub);
   if (query) {
-    listings = listings.filter((listing) => {
-      return `${listing.title} ${listing.summary} ${listing.price} ${listing.area} ${listing.district}`.toLowerCase().includes(query);
+    listings = listings.filter((l) => {
+      return `${l.title} ${l.summary} ${l.price} ${l.area} ${l.district} ${l.subDistrict}`.toLowerCase().includes(query);
     });
   }
 
   const usedProvinces = [...new Set(db.listings.map((l) => l.district))].filter(Boolean).sort();
+  const filteredForSub = province ? db.listings.filter((l) => l.district === province) : db.listings;
+  const usedSubs = [...new Set(filteredForSub.map((l) => l.subDistrict).filter(Boolean))].sort();
 
   return {
     listings: listings.slice(0, 500),
     total: listings.length,
-    provinces: usedProvinces,
+    provinces: [...new Set([...Object.keys(PROVINCE_SLUGS), ...usedProvinces])].sort(),
+    subDistricts: usedSubs,
     lastRun: db.runs[0] || null,
     debug: db.debug || []
   };
@@ -804,7 +847,8 @@ createServer(async (req, res) => {
 
   if (requestUrl.pathname === "/api/scan" && req.method === "POST") {
     try {
-      const run = await scanListings();
+      const province = requestUrl.searchParams.get("province") || "";
+      const run = await scanListings(province);
       sendJson(res, 200, { ok: true, run });
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error.message });
@@ -816,8 +860,5 @@ createServer(async (req, res) => {
 }).listen(PORT, () => {
   ensureDatabase();
   console.log(`Dashboard: http://localhost:${PORT}`);
-  scanListings().catch((error) => console.error("Initial scan failed:", error));
-  setInterval(() => {
-    scanListings().catch((error) => console.error("Scheduled scan failed:", error));
-  }, SCAN_EVERY_MS);
+  scanListings("Hà Nội").catch((error) => console.error("Initial scan failed:", error));
 });

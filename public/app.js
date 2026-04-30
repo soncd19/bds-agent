@@ -2,14 +2,18 @@ const state = {
   allListings: [],
   currentListings: [],
   pagedListings: [],
-  provincesLoaded: false,
+  provinces: [],
+  selectedProvince: "",
   sourcesLoaded: false,
   view: "list",
   page: 1,
   pageSize: 20
 };
 
-const provinceFilter = document.querySelector("#districtFilter");
+const provinceInput = document.querySelector("#provinceInput");
+const provinceSelect = document.querySelector("#provinceSelect");
+const provinceDropdown = document.querySelector("#provinceDropdown");
+const subDistrictFilter = document.querySelector("#subDistrictFilter");
 const searchInput = document.querySelector("#searchInput");
 const priceFilter = document.querySelector("#priceFilter");
 const areaFilter = document.querySelector("#areaFilter");
@@ -364,23 +368,60 @@ function setView(view) {
   }
 }
 
+function renderProvinceDropdown(filter) {
+  const q = (filter || "").toLowerCase();
+  const filtered = q ? state.provinces.filter((p) => p.toLowerCase().includes(q)) : state.provinces;
+  provinceDropdown.innerHTML = `<button class="custom-select-option all" type="button" data-province="">Tất cả tỉnh thành</button>`
+    + filtered.map((p) => `<button class="custom-select-option${p === state.selectedProvince ? " active" : ""}" type="button" data-province="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join("");
+}
+
+async function selectProvince(value) {
+  state.selectedProvince = value;
+  provinceInput.value = value;
+  provinceSelect.classList.remove("open");
+  subDistrictFilter.value = "";
+  await scanAndLoad();
+}
+
+provinceInput.addEventListener("focus", () => {
+  renderProvinceDropdown(provinceInput.value === state.selectedProvince ? "" : provinceInput.value);
+  provinceSelect.classList.add("open");
+});
+provinceInput.addEventListener("input", () => {
+  renderProvinceDropdown(provinceInput.value);
+  provinceSelect.classList.add("open");
+});
+provinceDropdown.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-province]");
+  if (btn) selectProvince(btn.dataset.province);
+});
+document.addEventListener("click", (e) => {
+  if (!provinceSelect.contains(e.target)) provinceSelect.classList.remove("open");
+});
+
 async function loadListings() {
   const params = new URLSearchParams();
-  if (provinceFilter.value) params.set("province", provinceFilter.value);
+  if (state.selectedProvince) params.set("province", state.selectedProvince);
+  if (subDistrictFilter.value) params.set("sub", subDistrictFilter.value);
   if (searchInput.value.trim()) params.set("q", searchInput.value.trim());
 
   const response = await fetch(`/api/listings?${params.toString()}`);
   const data = await response.json();
 
-  if (!state.provincesLoaded && data.provinces) {
-    for (const province of data.provinces) {
-      const option = document.createElement("option");
-      option.value = province;
-      option.textContent = province;
-      provinceFilter.append(option);
-    }
-    state.provincesLoaded = true;
+  if (data.provinces) {
+    state.provinces = data.provinces;
+    renderProvinceDropdown("");
   }
+
+  const prevSub = subDistrictFilter.value;
+  subDistrictFilter.innerHTML = `<option value="">Tất cả quận huyện</option>`;
+  for (const s of data.subDistricts || []) {
+    const opt = document.createElement("option");
+    opt.value = s;
+    opt.textContent = s;
+    subDistrictFilter.append(opt);
+  }
+  subDistrictFilter.value = (data.subDistricts || []).includes(prevSub) ? prevSub : "";
 
   state.allListings = data.listings || [];
   populateSources(state.allListings);
@@ -390,23 +431,29 @@ async function loadListings() {
   applySecondaryFilters();
 }
 
-async function scanNow() {
+async function scanAndLoad() {
   scanNowButton.disabled = true;
   scanNowButton.textContent = "Đang quét...";
   statusEl.textContent = "Đang quét nguồn dữ liệu...";
   try {
-    const response = await fetch("/api/scan", { method: "POST" });
+    const params = new URLSearchParams();
+    if (state.selectedProvince) params.set("province", state.selectedProvince);
+    const response = await fetch(`/api/scan?${params}`, { method: "POST" });
     if (!response.ok) throw new Error("Scan failed");
     await loadListings();
   } catch (error) {
-    statusEl.textContent = "Không quét được lúc này. Kiểm tra kết nối mạng hoặc log container.";
+    statusEl.textContent = "Không quét được lúc này.";
   } finally {
     scanNowButton.disabled = false;
     scanNowButton.textContent = "Quét ngay";
   }
 }
 
-provinceFilter.addEventListener("change", loadListings);
+async function scanNow() {
+  await scanAndLoad();
+}
+
+subDistrictFilter.addEventListener("change", loadListings);
 searchInput.addEventListener("input", () => {
   clearTimeout(searchInput.searchTimer);
   searchInput.searchTimer = setTimeout(loadListings, 250);
@@ -444,8 +491,8 @@ mapSurface.addEventListener("click", (event) => {
   const pin = event.target.closest("[data-map-district]");
   if (!pin) return;
 
-  provinceFilter.value = pin.dataset.mapDistrict;
-  loadListings();
+  provinceInput.value = pin.dataset.mapDistrict;
+  selectProvince(pin.dataset.mapDistrict);
 });
 modalClose.addEventListener("click", closeListingModal);
 listingModal.addEventListener("click", (event) => {
@@ -474,4 +521,3 @@ document.addEventListener("keydown", (event) => {
 });
 
 loadListings();
-setInterval(loadListings, 60_000);
