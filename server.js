@@ -88,7 +88,7 @@ const SOURCES = [
 function ensureDatabase() {
   mkdirSync(DATA_DIR, { recursive: true });
   if (!existsSync(DB_PATH)) {
-    writeDatabase({ listings: [], runs: [] });
+    writeDatabase({ listings: [], runs: [], debug: [] });
   }
 }
 
@@ -130,6 +130,7 @@ function isBlockedUrl(url) {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.replace(/^www\./, "");
+    // Only block root domain
     if (["alonhadat.com.vn", "batdongsan.com.vn"].includes(hostname) && parsed.pathname === "/") {
       return true;
     }
@@ -145,7 +146,12 @@ function isRelevantListing(listing) {
   const hasHouseLand = /(nha dat|nha o|nha rieng|nha pho|dat nen|dat tho cu|biet thu|lien ke|mat pho|mat tien)/i.test(text);
   const hasSaleIntent = /(ban|rao ban|mua ban|chuyen nhuong)/i.test(text);
   const isTrustedRealEstateApi = listing.sourceId === "nhatot-hanoi";
-  return !isBlockedUrl(listing.url) && (hasApartment || hasHouseLand) && (hasSaleIntent || isTrustedRealEstateApi);
+  
+  const blocked = isBlockedUrl(listing.url);
+  const hasType = (hasApartment || hasHouseLand);
+  const hasSale = (hasSaleIntent || isTrustedRealEstateApi);
+  
+  return !blocked && hasType && hasSale;
 }
 
 function decodeEntities(value) {
@@ -584,11 +590,13 @@ async function scanListings() {
   const startedAt = new Date().toISOString();
   const found = [];
   const errors = [];
+  const debugLog = [];
 
   for (const source of SOURCES) {
     const urls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
     for (const url of urls) {
       try {
+        debugLog.push(`[${source.id}] Scanning: ${url}`);
         const headers = {
           "accept": source.type === "nhatot" ? "application/json, text/plain, */*" : "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "user-agent": "Mozilla/5.0 HanoiApartmentListingMonitor/1.0"
@@ -605,17 +613,23 @@ async function scanListings() {
         if (/cf_chl_|Enable JavaScript and cookies to continue|Just a moment/i.test(body)) {
           throw new Error("Blocked by Cloudflare challenge");
         }
+        
+        let sourcedListings = [];
         if (source.type === "alonhadat") {
-          found.push(...await parseAlonhadat(body, source));
+          sourcedListings = await parseAlonhadat(body, source);
         } else if (source.type === "batdongsan") {
-          found.push(...parseBatdongsan(body, source));
+          sourcedListings = parseBatdongsan(body, source);
         } else if (source.type === "nhatot") {
-          found.push(...parseNhatot(body, source));
+          sourcedListings = parseNhatot(body, source);
         } else {
           const district = DISTRICTS.find((name) => url.includes(encodeURIComponent(name))) || "Hà Nội";
-          found.push(...parseRss(body, source, district));
+          sourcedListings = parseRss(body, source, district);
         }
+        
+        debugLog.push(`[${source.id}] Found ${sourcedListings.length} listings from ${url}`);
+        found.push(...sourcedListings);
       } catch (error) {
+        debugLog.push(`[${source.id}] Error: ${error.message}`);
         errors.push({ sourceId: source.id, url, message: error.message });
       }
     }
@@ -637,9 +651,14 @@ async function scanListings() {
     }
   }
 
+  debugLog.push(`[FILTER] Before filter: ${[...byId.values()].length} listings`);
+  
   const listings = [...byId.values()].filter(isRelevantListing).sort((a, b) => {
     return new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime();
   });
+  
+  debugLog.push(`[FILTER] After isRelevantListing: ${listings.length} listings`);
+  debugLog.push(`[SOURCES] Batdongsan: ${listings.filter(l => l.sourceId === 'batdongsan-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
 
   db.listings = listings.slice(0, 2000);
   db.runs = [
@@ -653,6 +672,8 @@ async function scanListings() {
     },
     ...db.runs
   ].slice(0, 50);
+  
+  db.debug = debugLog.slice(-100); // Keep last 100 debug logs
 
   writeDatabase(db);
   return db.runs[0];
@@ -676,7 +697,8 @@ function filterListings(requestUrl) {
     total: listings.length,
     districts: DISTRICTS,
     districtLabels: Object.fromEntries(DISTRICT_VI),
-    lastRun: db.runs[0] || null
+    lastRun: db.runs[0] || null,
+    debug: db.debug || []
   };
 }
 
