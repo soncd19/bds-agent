@@ -65,12 +65,23 @@ const SOURCES = [
     ]
   },
   {
-    id: "batdongsan-hanoi",
-    name: "Batdongsan.com.vn",
-    type: "batdongsan",
+    id: "mogi-hanoi",
+    name: "Mogi.vn",
+    type: "mogi",
     urls: [
-      "https://batdongsan.com.vn/ban-can-ho-chung-cu-ha-noi",
-      "https://batdongsan.com.vn/ban-can-ho-chung-cu-ha-noi/p2"
+      "https://mogi.vn/ha-noi/mua-can-ho-chung-cu",
+      "https://mogi.vn/ha-noi/mua-can-ho-chung-cu?cp=2",
+      "https://mogi.vn/ha-noi/mua-nha",
+      "https://mogi.vn/ha-noi/mua-dat"
+    ]
+  },
+  {
+    id: "homedy-hanoi",
+    name: "Homedy",
+    type: "homedy",
+    urls: [
+      "https://homedy.com/ban-nha-dat-ha-noi",
+      "https://homedy.com/ban-nha-dat-ha-noi/p2"
     ]
   },
   {
@@ -327,8 +338,9 @@ async function enrichAlonhadatListings(listings) {
 async function enrichAlonhadatListing(listing) {
   const response = await fetch(listing.url, {
     headers: {
-      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "user-agent": "HanoiApartmentListingMonitor/1.0 (+local dashboard)"
+      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     }
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -371,6 +383,73 @@ function parseBatdongsan(html, source) {
   }
 
   return [...byId.values()];
+}
+
+function parseHomedy(html, source) {
+  const blocks = [...html.matchAll(/<a[^>]*class=['"]thumb-image['"][\s\S]*?<\/ul>/gi)];
+  return blocks.map((match) => {
+    const block = match[0];
+    const href = block.match(/href=['"]([^'"]+)['"]/i)?.[1] || "";
+    const url = href.startsWith("http") ? href : `https://homedy.com${href}`;
+    const titleEl = block.match(/<h3[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
+    const title = normalizeText(titleEl?.[1] || extractAttribute(block.match(/<a[^>]*class=['"]thumb-image['"][^>]*>/i)?.[0] || "", "title"));
+    const summary = extractClass(block, "description");
+    const price = extractClass(block, "price");
+    const area = extractClass(block, "acreage");
+    const image = extractAttribute(block.match(/<img[^>]*>/i)?.[0] || "", "data-src") || extractAttribute(block.match(/<img[^>]*>/i)?.[0] || "", "src");
+    const combined = `${title} ${summary}`;
+
+    return {
+      id: createHash("sha1").update(url).digest("hex"),
+      title,
+      url,
+      summary,
+      district: inferDistrict(combined),
+      price: price || extractPrice(combined),
+      area: area || extractArea(combined),
+      image: image ? absolutizeUrl(image, "https://homedy.com") : "",
+      images: image ? [absolutizeUrl(image, "https://homedy.com")] : [],
+      sourceId: source.id,
+      sourceName: source.name,
+      publishedAt: null,
+      firstSeenAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString()
+    };
+  }).filter((listing) => listing.title && listing.url && isRelevantListing(listing));
+}
+
+function parseMogi(html, source) {
+  const blocks = [...html.matchAll(/<div[^>]*class=['"][^'"]*prop-info['"][^>]*>[\s\S]*?<\/div>\s*<\/div>/gi)];
+  return blocks.map((match) => {
+    const block = match[0];
+    const href = block.match(/href=['"]([^'"]+)['"]/i)?.[1] || "";
+    const url = href.startsWith("http") ? href : `https://mogi.vn${href}`;
+    const title = extractClass(block, "prop-title");
+    const address = extractClass(block, "prop-addr");
+    const price = extractClass(block, "price");
+    const attrBlock = block.match(/<ul[^>]*class=['"][^'"]*prop-attr[^'"]*['"][\s\S]*?<\/ul>/i)?.[0] || "";
+    const area = normalizeText(attrBlock.match(/<li>([\s\S]*?)<\/li>/i)?.[1] || "");
+    const imgBlock = html.slice(Math.max(0, html.indexOf(block) - 600), html.indexOf(block));
+    const images = extractImageUrls(imgBlock, "https://mogi.vn");
+    const combined = `${title} ${address}`;
+
+    return {
+      id: createHash("sha1").update(url).digest("hex"),
+      title,
+      url,
+      summary: address,
+      district: inferDistrict(combined),
+      price: price || extractPrice(combined),
+      area: area || extractArea(combined),
+      image: images[0] || "",
+      images,
+      sourceId: source.id,
+      sourceName: source.name,
+      publishedAt: null,
+      firstSeenAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString()
+    };
+  }).filter((listing) => listing.title && listing.url && isRelevantListing(listing));
 }
 
 function parseNhatot(jsonText, source) {
@@ -598,12 +677,19 @@ async function scanListings() {
       try {
         debugLog.push(`[${source.id}] Scanning: ${url}`);
         const headers = {
-          "accept": source.type === "nhatot" ? "application/json, text/plain, */*" : "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "user-agent": "Mozilla/5.0 HanoiApartmentListingMonitor/1.0"
+          "accept": source.type === "nhatot" ? "application/json, text/plain, */*" : "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
         };
         if (source.type === "nhatot") {
           headers.origin = "https://www.nhatot.com";
           headers.referer = "https://www.nhatot.com/";
+        }
+        if (source.type === "mogi") {
+          headers.referer = "https://mogi.vn/";
+        }
+        if (source.type === "homedy") {
+          headers.referer = "https://homedy.com/";
         }
         const response = await fetch(url, {
           headers
@@ -617,8 +703,10 @@ async function scanListings() {
         let sourcedListings = [];
         if (source.type === "alonhadat") {
           sourcedListings = await parseAlonhadat(body, source);
-        } else if (source.type === "batdongsan") {
-          sourcedListings = parseBatdongsan(body, source);
+        } else if (source.type === "mogi") {
+          sourcedListings = parseMogi(body, source);
+        } else if (source.type === "homedy") {
+          sourcedListings = parseHomedy(body, source);
         } else if (source.type === "nhatot") {
           sourcedListings = parseNhatot(body, source);
         } else {
@@ -651,14 +739,14 @@ async function scanListings() {
     }
   }
 
-  debugLog.push(`[FILTER] Before filter: ${[...byId.values()].length} listings`);
-  
-  const listings = [...byId.values()].filter(isRelevantListing).sort((a, b) => {
+  const activeSourceIds = new Set(SOURCES.map((s) => s.id));
+
+  const listings = [...byId.values()].filter((l) => activeSourceIds.has(l.sourceId) && isRelevantListing(l)).sort((a, b) => {
     return new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime();
   });
   
-  debugLog.push(`[FILTER] After isRelevantListing: ${listings.length} listings`);
-  debugLog.push(`[SOURCES] Batdongsan: ${listings.filter(l => l.sourceId === 'batdongsan-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
+  debugLog.push(`[FILTER] After filter: ${listings.length} listings`);
+  debugLog.push(`[SOURCES] Mogi: ${listings.filter(l => l.sourceId === 'mogi-hanoi').length}, Homedy: ${listings.filter(l => l.sourceId === 'homedy-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
 
   db.listings = listings.slice(0, 2000);
   db.runs = [

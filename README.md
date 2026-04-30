@@ -47,6 +47,6 @@ docker run -d --name bds-agent -p 5173:5173 -v ${PWD}\data:/app/data bds-agent:l
 
 ## Ghi chu ve nguon du lieu
 
-Nguon mac dinh gom trang danh muc Alonhadat va Batdongsan.com.vn cho tin ban can ho chung cu Ha Noi. Batdongsan.com.vn co the tra Cloudflare `HTTP 403` voi mot so URL khi server/container goi truc tiep; khi do lan quet se ghi loi source do va tiep tuc xu ly cac URL/nguon con lai. Neu can du lieu day du/chinh xac hon, nen tich hop API/chinh sach cap phep tu cac san bat dong san, hoac them nguon co cau truc vao `SOURCES` trong `server.js`.
+Nguon mac dinh gom trang danh muc Alonhadat, Mogi.vn, Homedy va Nha Tot (Chotot) cho tin ban can ho chung cu Ha Noi.
 
 Nut `Quet ngay` goi `POST /api/scan`. Ngoai ra server tu dong quet khi khoi dong va sau do lap lai moi 1 gio.
