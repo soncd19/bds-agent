@@ -133,9 +133,14 @@ function isBlockedUrl(url) {
     if (["alonhadat.com.vn", "batdongsan.com.vn"].includes(hostname) && parsed.pathname === "/") {
       return true;
     }
-    return hostname === "batdongsan.com.vn"
-      && parsed.pathname.startsWith("/ban-can-ho-chung-cu")
-      && !/-pr\d+$/i.test(parsed.pathname);
+    // Chỉ chặn URL trang danh sách (listing page) mà không có pagination parameter hoặc PR ID
+    // Cho phép URL detail (với -pr<số> hoặc query parameters)
+    if (hostname === "batdongsan.com.vn" && parsed.pathname.startsWith("/ban-can-ho-chung-cu")) {
+      const hasDetailParameter = /-pr\d+$/i.test(parsed.pathname) || parsed.search.length > 0;
+      const isMainListingPage = !hasDetailParameter && /^\/ban-can-ho-chung-cu-[a-z0-9-]*\/?$/.test(parsed.pathname);
+      return isMainListingPage;
+    }
+    return false;
   } catch {
     return true;
   }
@@ -549,7 +554,7 @@ function cleanScrapedTitle(value) {
     /\s+Q\.\s+/i,
     /\s+H\.\s+/i,
     /\s+Đăng\s+\d+\s+ngày/i,
-    /\s+Hiện\s+số/i
+    /\s+Hiện\s+số/i
   ];
   const indexes = delimiters.map((pattern) => raw.search(pattern)).filter((index) => index > 20);
   const cutIndex = indexes.length ? Math.min(...indexes) : -1;
@@ -564,7 +569,7 @@ function extractBatdongsanSummary(text, title) {
     .replace(/^(?:Giá\s+thỏa\s+thuận|\d+(?:[.,]\d+)?\s*(?:tỷ|triệu|m²|m2|tr\/m²)|·|\s)+/i, "")
     .replace(/^(?:Q\.|H\.|P\.)\s+[^)]*\)\s*/i, "")
     .replace(/\s*[A-ZÀ-Ỹ]\s+‎?[^·]{0,80}Đăng\s+\d+\s+ngày\s+trước[\s\S]*$/i, "")
-    .replace(/\s*Hiện\s+số\s*$/i, "")
+    .replace(/\s*Hiện\s+số\s*$/i, "")
     .trim();
   return summary || raw || title;
 }
