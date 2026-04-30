@@ -133,13 +133,6 @@ function isBlockedUrl(url) {
     if (["alonhadat.com.vn", "batdongsan.com.vn"].includes(hostname) && parsed.pathname === "/") {
       return true;
     }
-    // Chỉ chặn URL trang danh sách (listing page) mà không có pagination parameter hoặc PR ID
-    // Cho phép URL detail (với -pr<số> hoặc query parameters)
-    if (hostname === "batdongsan.com.vn" && parsed.pathname.startsWith("/ban-can-ho-chung-cu")) {
-      const hasDetailParameter = /-pr\d+$/i.test(parsed.pathname) || parsed.search.length > 0;
-      const isMainListingPage = !hasDetailParameter && /^\/ban-can-ho-chung-cu-[a-z0-9-]*\/?$/.test(parsed.pathname);
-      return isMainListingPage;
-    }
     return false;
   } catch {
     return true;
@@ -367,7 +360,7 @@ function parseBatdongsan(html, source) {
   const byId = new Map();
 
   for (const listing of listings) {
-    if (!listing.title || !listing.url || !isRelevantListing(listing)) continue;
+    if (!listing.title || !listing.url) continue;
     byId.set(listing.id, listing);
   }
 
