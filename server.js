@@ -80,8 +80,8 @@ const SOURCES = [
     name: "Homedy",
     type: "homedy",
     urls: [
-      "https://homedy.com/ban-nha-dat-ha-noi",
-      "https://homedy.com/ban-nha-dat-ha-noi/p2"
+      "https://homedy.com/sitemap/detail-{today}.xml",
+      "https://homedy.com/sitemap/detail-{yesterday}.xml"
     ]
   },
   {
@@ -229,6 +229,13 @@ function improveImageUrl(url) {
   }
   if (/file\d*\.batdongsan\.com\.vn\/resize\/\d+x\d+\//i.test(url)) {
     return url.replace(/\/resize\/\d+x\d+\//i, "/resize/745x510/");
+  }
+  return url;
+}
+
+function improveMogiImageUrl(url) {
+  if (/cloud\.mogi\.vn\/images\/thumb[^/]*\//i.test(url)) {
+    return url.replace(/\/images\/thumb[^/]*\//i, "/images/");
   }
   return url;
 }
@@ -385,42 +392,50 @@ function parseBatdongsan(html, source) {
   return [...byId.values()];
 }
 
-function parseHomedy(html, source) {
-  const blocks = [...html.matchAll(/<a[^>]*class=['"]thumb-image['"][\s\S]*?<\/ul>/gi)];
-  return blocks.map((match) => {
-    const block = match[0];
-    const href = block.match(/href=['"]([^'"]+)['"]/i)?.[1] || "";
-    const url = href.startsWith("http") ? href : `https://homedy.com${href}`;
-    const titleEl = block.match(/<h3[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
-    const title = normalizeText(titleEl?.[1] || extractAttribute(block.match(/<a[^>]*class=['"]thumb-image['"][^>]*>/i)?.[0] || "", "title"));
-    const summary = extractClass(block, "description");
-    const price = extractClass(block, "price");
-    const area = extractClass(block, "acreage");
-    const image = extractAttribute(block.match(/<img[^>]*>/i)?.[0] || "", "data-src") || extractAttribute(block.match(/<img[^>]*>/i)?.[0] || "", "src");
-    const combined = `${title} ${summary}`;
+function parseHomedy(xml, source) {
+  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/gi)]
+    .map((m) => m[1].trim())
+    .filter((u) => /ha-noi.*es\d+$/i.test(u));
 
-    return {
-      id: createHash("sha1").update(url).digest("hex"),
-      title,
-      url,
-      summary,
-      district: inferDistrict(combined),
-      price: price || extractPrice(combined),
-      area: area || extractArea(combined),
-      image: image ? absolutizeUrl(image, "https://homedy.com") : "",
-      images: image ? [absolutizeUrl(image, "https://homedy.com")] : [],
-      sourceId: source.id,
-      sourceName: source.name,
-      publishedAt: null,
-      firstSeenAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString()
-    };
-  }).filter((listing) => listing.title && listing.url && isRelevantListing(listing));
+  return Promise.all(urls.map(async (url) => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        }
+      });
+      if (!res.ok) return null;
+      const html = await res.text();
+      if (html.includes("error/404")) return null;
+      const title = normalizeText(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || "");
+      const desc = normalizeText(html.match(/<div[^>]*class=['"][^'"]*description readmore[^'"]*['"][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)?.[1] || "");
+      const combined = `${title} ${desc} ${url}`;
+      const images = extractImageUrls(html.match(/<div[^>]*class=['"][^'"]*gallery[^'"]*['"][\s\S]*?<\/div>/i)?.[0] || "", "https://homedy.com");
+      return {
+        id: createHash("sha1").update(url).digest("hex"),
+        title,
+        url,
+        summary: desc || title,
+        district: inferDistrict(combined),
+        price: extractPrice(combined),
+        area: extractArea(combined),
+        image: images[0] || "",
+        images,
+        sourceId: source.id,
+        sourceName: source.name,
+        publishedAt: null,
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString()
+      };
+    } catch { return null; }
+  })).then((results) => results.filter((l) => l && l.title && isRelevantListing(l)));
 }
 
-function parseMogi(html, source) {
+async function parseMogi(html, source) {
   const blocks = [...html.matchAll(/<div[^>]*class=['"][^'"]*prop-info['"][^>]*>[\s\S]*?<\/div>\s*<\/div>/gi)];
-  return blocks.map((match) => {
+  const listings = blocks.map((match) => {
     const block = match[0];
     const href = block.match(/href=['"]([^'"]+)['"]/i)?.[1] || "";
     const url = href.startsWith("http") ? href : `https://mogi.vn${href}`;
@@ -430,7 +445,7 @@ function parseMogi(html, source) {
     const attrBlock = block.match(/<ul[^>]*class=['"][^'"]*prop-attr[^'"]*['"][\s\S]*?<\/ul>/i)?.[0] || "";
     const area = normalizeText(attrBlock.match(/<li>([\s\S]*?)<\/li>/i)?.[1] || "");
     const imgBlock = html.slice(Math.max(0, html.indexOf(block) - 600), html.indexOf(block));
-    const images = extractImageUrls(imgBlock, "https://mogi.vn");
+    const images = extractImageUrls(imgBlock, "https://mogi.vn").map(improveMogiImageUrl);
     const combined = `${title} ${address}`;
 
     return {
@@ -450,6 +465,28 @@ function parseMogi(html, source) {
       lastSeenAt: new Date().toISOString()
     };
   }).filter((listing) => listing.title && listing.url && isRelevantListing(listing));
+
+  const enriched = [];
+  for (const listing of listings) {
+    try {
+      const res = await fetch(listing.url, {
+        headers: {
+          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const detail = await res.text();
+      const desc = normalizeText(detail.match(/<div[^>]*class=['"][^'"]*info-content-body[^'"]*['"][^>]*>([\s\S]*?)<\/div>/i)?.[1] || "");
+      const detailImages = [...detail.matchAll(/(?:data-src|src)=['"]([^'"]*cloud\.mogi\.vn\/images\/\d[^'"]+)['"]/gi)].map((m) => m[1]);
+      const allImages = [...new Set([...detailImages, ...listing.images.map(improveMogiImageUrl)].filter(Boolean))];
+      enriched.push({ ...listing, summary: desc || listing.summary, images: allImages, image: allImages[0] || listing.image });
+    } catch {
+      enriched.push(listing);
+    }
+  }
+  return enriched;
 }
 
 function parseNhatot(jsonText, source) {
@@ -672,14 +709,25 @@ async function scanListings() {
   const debugLog = [];
 
   for (const source of SOURCES) {
-    const urls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
+    const rawUrls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10).replace(/-/g, "");
+    const urls = rawUrls.map((u) => u.replace("{today}", today).replace("{yesterday}", yesterday));
     for (const url of urls) {
       try {
         debugLog.push(`[${source.id}] Scanning: ${url}`);
         const headers = {
           "accept": source.type === "nhatot" ? "application/json, text/plain, */*" : "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
           "accept-language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
-          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "sec-ch-ua": "\"Google Chrome\";v=\"125\", \"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"Windows\"",
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+          "sec-fetch-user": "?1",
+          "upgrade-insecure-requests": "1"
         };
         if (source.type === "nhatot") {
           headers.origin = "https://www.nhatot.com";
@@ -689,7 +737,7 @@ async function scanListings() {
           headers.referer = "https://mogi.vn/";
         }
         if (source.type === "homedy") {
-          headers.referer = "https://homedy.com/";
+          headers.accept = "application/xml, text/xml, */*;q=0.8";
         }
         const response = await fetch(url, {
           headers
@@ -704,9 +752,9 @@ async function scanListings() {
         if (source.type === "alonhadat") {
           sourcedListings = await parseAlonhadat(body, source);
         } else if (source.type === "mogi") {
-          sourcedListings = parseMogi(body, source);
+          sourcedListings = await parseMogi(body, source);
         } else if (source.type === "homedy") {
-          sourcedListings = parseHomedy(body, source);
+          sourcedListings = await parseHomedy(body, source);
         } else if (source.type === "nhatot") {
           sourcedListings = parseNhatot(body, source);
         } else {
