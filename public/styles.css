@@ -110,6 +110,7 @@ button { cursor: pointer; }
   padding: 130px clamp(20px, 6vw, 80px) 170px;
   overflow: hidden;
   background-image: var(--hero-image);
+  background-attachment: fixed;
   background-position: center;
   background-size: cover;
 }
@@ -817,6 +818,7 @@ dd {
 }
 
 @media (max-width: 760px) {
+  .hero { background-attachment: scroll; }
   .site-header {
     border-radius: 18px;
   }
