@@ -1,50 +1,15 @@
-const DISTRICT_POSITIONS = {
-  "Ba Đình": [46, 43],
-  "Hoàn Kiếm": [52, 47],
-  "Tây Hồ": [43, 35],
-  "Long Biên": [62, 43],
-  "Cầu Giấy": [39, 45],
-  "Đống Đa": [45, 50],
-  "Hai Bà Trưng": [53, 54],
-  "Hoàng Mai": [56, 64],
-  "Thanh Xuân": [42, 57],
-  "Nam Từ Liêm": [31, 51],
-  "Bắc Từ Liêm": [30, 39],
-  "Hà Đông": [32, 66],
-  "Sơn Tây": [12, 33],
-  "Ba Vì": [7, 21],
-  "Chương Mỹ": [24, 76],
-  "Đan Phượng": [24, 33],
-  "Đông Anh": [52, 24],
-  "Gia Lâm": [70, 50],
-  "Hoài Đức": [25, 48],
-  "Mê Linh": [43, 16],
-  "Mỹ Đức": [23, 90],
-  "Phú Xuyên": [55, 91],
-  "Phúc Thọ": [18, 30],
-  "Quốc Oai": [18, 59],
-  "Sóc Sơn": [57, 10],
-  "Thạch Thất": [14, 52],
-  "Thanh Oai": [37, 78],
-  "Thanh Trì": [52, 71],
-  "Thường Tín": [50, 82],
-  "Ứng Hòa": [37, 91],
-  "Hà Nội": [48, 49]
-};
-
 const state = {
   allListings: [],
   currentListings: [],
   pagedListings: [],
-  districtsLoaded: false,
+  provincesLoaded: false,
   sourcesLoaded: false,
-  districtLabels: {},
   view: "list",
   page: 1,
-  pageSize: 10
+  pageSize: 20
 };
 
-const districtFilter = document.querySelector("#districtFilter");
+const provinceFilter = document.querySelector("#districtFilter");
 const searchInput = document.querySelector("#searchInput");
 const priceFilter = document.querySelector("#priceFilter");
 const areaFilter = document.querySelector("#areaFilter");
@@ -173,7 +138,7 @@ function imageTemplate(listing) {
 function listingTemplate(listing) {
   const price = listing.price || "Chưa tách được giá";
   const area = listing.area || "Chưa tách được diện tích";
-  const district = state.districtLabels[listing.district] || listing.district;
+  const district = listing.district || "";
   const displayTitle = cleanTitle(listing);
   const displaySummary = cleanSummary(listing);
 
@@ -234,7 +199,7 @@ function openListingModal(listingId) {
 
   const price = listing.price || "Chưa tách được giá";
   const area = listing.area || "Chưa tách được diện tích";
-  const district = state.districtLabels[listing.district] || listing.district || "Hà Nội";
+  const district = listing.district || "";
   const displayTitle = cleanTitle(listing);
   const description = buildFullDescription(listing);
   const isLongDescription = description.length > 520;
@@ -364,23 +329,19 @@ function renderPagination(totalPages) {
 function renderMap() {
   const groups = new Map();
   for (const listing of state.currentListings) {
-    const district = listing.district || "Hà Nội";
-    const items = groups.get(district) || [];
+    const province = listing.district || "Khác";
+    const items = groups.get(province) || [];
     items.push(listing);
-    groups.set(district, items);
+    groups.set(province, items);
   }
 
-  const pins = [...groups.entries()].map(([district, listings]) => {
-    const [x, y] = DISTRICT_POSITIONS[district] || DISTRICT_POSITIONS["Hà Nội"];
-    const firstListing = listings[0];
-    return `
-      <button class="map-pin" type="button" style="left: ${x}%; top: ${y}%;" data-map-district="${escapeHtml(district)}">
-        <span>${listings.length}</span>
-        <strong>${escapeHtml(district)}</strong>
-        <small>${escapeHtml(firstListing.price || "Đang cập nhật giá")}</small>
-      </button>
-    `;
-  }).join("");
+  const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+  const cards = sorted.map(([province, listings]) => `
+    <button class="map-region-card" type="button" data-map-district="${escapeHtml(province)}">
+      <strong>${escapeHtml(province)}</strong>
+      <span>${listings.length} tin</span>
+    </button>
+  `).join("");
 
   const summary = state.currentListings.length
     ? `${state.currentListings.length.toLocaleString("vi-VN")} tin theo khu vực`
@@ -388,12 +349,10 @@ function renderMap() {
 
   mapSurface.innerHTML = `
     <div class="map-title">
-      <strong>Bản đồ Hà Nội</strong>
+      <strong>Phân bố theo tỉnh/thành</strong>
       <span>${summary}</span>
     </div>
-    <div class="map-grid"></div>
-    ${pins}
-    <div class="map-note">Vị trí đang hiển thị gần đúng theo quận/huyện từ nội dung tin đăng.</div>
+    <div class="map-region-grid">${cards}</div>
   `;
 }
 
@@ -407,21 +366,20 @@ function setView(view) {
 
 async function loadListings() {
   const params = new URLSearchParams();
-  if (districtFilter.value) params.set("district", districtFilter.value);
+  if (provinceFilter.value) params.set("province", provinceFilter.value);
   if (searchInput.value.trim()) params.set("q", searchInput.value.trim());
 
   const response = await fetch(`/api/listings?${params.toString()}`);
   const data = await response.json();
 
-  state.districtLabels = data.districtLabels || {};
-  if (!state.districtsLoaded) {
-    for (const district of data.districts) {
+  if (!state.provincesLoaded && data.provinces) {
+    for (const province of data.provinces) {
       const option = document.createElement("option");
-      option.value = district;
-      option.textContent = state.districtLabels[district] || district;
-      districtFilter.append(option);
+      option.value = province;
+      option.textContent = province;
+      provinceFilter.append(option);
     }
-    state.districtsLoaded = true;
+    state.provincesLoaded = true;
   }
 
   state.allListings = data.listings || [];
@@ -448,7 +406,7 @@ async function scanNow() {
   }
 }
 
-districtFilter.addEventListener("change", loadListings);
+provinceFilter.addEventListener("change", loadListings);
 searchInput.addEventListener("input", () => {
   clearTimeout(searchInput.searchTimer);
   searchInput.searchTimer = setTimeout(loadListings, 250);
@@ -486,7 +444,7 @@ mapSurface.addEventListener("click", (event) => {
   const pin = event.target.closest("[data-map-district]");
   if (!pin) return;
 
-  districtFilter.value = pin.dataset.mapDistrict;
+  provinceFilter.value = pin.dataset.mapDistrict;
   loadListings();
 });
 modalClose.addEventListener("click", closeListingModal);

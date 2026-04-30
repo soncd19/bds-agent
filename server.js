@@ -11,40 +11,23 @@ const DATA_DIR = join(ROOT, "data");
 const DB_PATH = join(DATA_DIR, "listings.json");
 const SCAN_EVERY_MS = 60 * 60 * 1000;
 
-const DISTRICTS = [
-  "Ba Đình",
-  "Hoàn Kiếm",
-  "Tây Hồ",
-  "Long Biên",
-  "Cầu Giấy",
-  "Đống Đa",
-  "Hai Bà Trưng",
-  "Hoàng Mai",
-  "Thanh Xuân",
-  "Nam Từ Liêm",
-  "Bắc Từ Liêm",
-  "Hà Đông",
-  "Sơn Tây",
-  "Ba Vì",
-  "Chương Mỹ",
-  "Đan Phượng",
-  "Đông Anh",
-  "Gia Lâm",
-  "Hoài Đức",
-  "Mê Linh",
-  "Mỹ Đức",
-  "Phú Xuyên",
-  "Phúc Thọ",
-  "Quốc Oai",
-  "Sóc Sơn",
-  "Thạch Thất",
-  "Thanh Oai",
-  "Thanh Trì",
-  "Thường Tín",
-  "Ứng Hòa"
+const PROVINCES = [
+  "Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
+  "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước",
+  "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông",
+  "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang",
+  "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình",
+  "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu",
+  "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định",
+  "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên",
+  "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị",
+  "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên",
+  "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang",
+  "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
 ];
 
-const DISTRICT_VI = new Map(DISTRICTS.map((district) => [district, district]));
+const PROVINCE_VI = new Map(PROVINCES.map((p) => [p, p]));
 
 const MIME_TYPES = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -56,38 +39,40 @@ const MIME_TYPES = new Map([
 
 const SOURCES = [
   {
-    id: "alonhadat-hanoi",
+    id: "alonhadat",
     name: "Alonhadat",
     type: "alonhadat",
     urls: [
-      "https://alonhadat.com.vn/can-ban-can-ho-chung-cu/ha-noi",
-      "https://alonhadat.com.vn/can-ban-can-ho-chung-cu/ha-noi/trang-2"
+      "https://alonhadat.com.vn/can-ban-can-ho-chung-cu",
+      "https://alonhadat.com.vn/can-ban-can-ho-chung-cu/trang-2",
+      "https://alonhadat.com.vn/can-ban-nha",
+      "https://alonhadat.com.vn/can-ban-dat"
     ]
   },
   {
-    id: "mogi-hanoi",
+    id: "mogi",
     name: "Mogi.vn",
     type: "mogi",
     urls: [
-      "https://mogi.vn/ha-noi/mua-can-ho-chung-cu",
-      "https://mogi.vn/ha-noi/mua-can-ho-chung-cu?cp=2",
-      "https://mogi.vn/ha-noi/mua-nha",
-      "https://mogi.vn/ha-noi/mua-nha?cp=2",
-      "https://mogi.vn/ha-noi/mua-dat",
-      "https://mogi.vn/ha-noi/mua-dat?cp=2"
+      "https://mogi.vn/mua-can-ho-chung-cu",
+      "https://mogi.vn/mua-can-ho-chung-cu?cp=2",
+      "https://mogi.vn/mua-nha",
+      "https://mogi.vn/mua-nha?cp=2",
+      "https://mogi.vn/mua-dat",
+      "https://mogi.vn/mua-dat?cp=2"
     ]
   },
   {
-    id: "nhatot-hanoi",
+    id: "nhatot",
     name: "Nhà Tốt",
     type: "nhatot",
     urls: [
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&region_v2=12000&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&region_v2=12000&limit=20&o=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&region_v2=12000&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&region_v2=12000&limit=20&o=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&region_v2=12000&limit=20",
-      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&region_v2=12000&limit=20&o=20"
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&limit=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1010&limit=20&o=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&limit=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1020&limit=20&o=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&limit=20",
+      "https://gateway.chotot.com/v1/public/ad-listing?cg=1040&limit=20&o=20"
     ]
   }
 ];
@@ -152,7 +137,7 @@ function isRelevantListing(listing) {
   const hasApartment = /(chung cu|can ho|apartment|condo)/i.test(text);
   const hasHouseLand = /(nha dat|nha o|nha rieng|nha pho|dat nen|dat tho cu|biet thu|lien ke|mat pho|mat tien)/i.test(text);
   const hasSaleIntent = /(ban|rao ban|mua ban|chuyen nhuong)/i.test(text);
-  const isTrustedRealEstateApi = listing.sourceId === "nhatot-hanoi";
+  const isTrustedRealEstateApi = listing.sourceId === "nhatot";
   
   const blocked = isBlockedUrl(listing.url);
   const hasType = (hasApartment || hasHouseLand);
@@ -250,9 +235,18 @@ function toIsoDate(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function inferDistrict(text) {
+const PROVINCE_ALIASES = [
+  ["Hồ Chí Minh", ["ho chi minh", "hcm", "sai gon", "quan 1", "quan 2", "quan 3", "quan 4", "quan 5", "quan 6", "quan 7", "quan 8", "quan 9", "quan 10", "quan 11", "quan 12", "binh thanh", "go vap", "phu nhuan", "tan binh", "tan phu", "binh tan", "thu duc", "nha be", "can gio", "cu chi", "hoc mon", "binh chanh"]],
+  ["Hà Nội", ["ha noi", "ba dinh", "hoan kiem", "tay ho", "long bien", "cau giay", "dong da", "hai ba trung", "hoang mai", "thanh xuan", "nam tu liem", "bac tu liem", "ha dong"]],
+  ["Đà Nẵng", ["da nang", "hai chau", "thanh khe", "son tra", "ngu hanh son", "lien chieu", "cam le"]],
+];
+
+function inferProvince(text) {
   const folded = foldText(text);
-  return DISTRICTS.find((district) => folded.includes(foldText(district))) || "Hà Nội";
+  for (const [province, aliases] of PROVINCE_ALIASES) {
+    if (aliases.some((a) => folded.includes(a))) return province;
+  }
+  return PROVINCES.find((p) => folded.includes(foldText(p))) || "Khác";
 }
 
 function parseRss(xml, source, district) {
@@ -308,7 +302,7 @@ async function parseAlonhadat(html, source) {
       title,
       url,
       summary,
-      district: inferDistrict(`${title} ${summary} ${address}`),
+      district: inferProvince(`${title} ${summary} ${address}`),
       price: price || extractPrice(`${title} ${summary}`),
       area: area || extractArea(`${title} ${summary}`),
       image,
@@ -408,7 +402,7 @@ async function parseMogi(html, source) {
       title,
       url,
       summary: address,
-      district: inferDistrict(combined),
+      district: inferProvince(combined),
       price: price || extractPrice(combined),
       area: area || extractArea(combined),
       image: images[0] || "",
@@ -461,7 +455,7 @@ function parseNhatot(jsonText, source) {
       title,
       url,
       summary,
-      district: inferDistrict(combined),
+      district: inferProvince(combined),
       price: normalizeText(ad.price_string || formatNhatotPrice(ad.price)),
       area: ad.size ? `${String(ad.size).replace(".", ",")} m2` : extractArea(combined),
       image: images[0] || "",
@@ -546,7 +540,7 @@ function collectBatdongsanItems(value, listings, source) {
         title,
         url,
         summary,
-        district: inferDistrict(combined),
+        district: inferProvince(combined),
         price: extractPrice(combined),
         area: extractArea(combined),
         image: normalizeImages(candidate.image)[0] || "",
@@ -602,7 +596,7 @@ function parseBatdongsanAnchors(html, source) {
       title,
       url,
       summary,
-      district: inferDistrict(title),
+      district: inferProvince(title),
       price: extractPrice(anchor.text),
       area: extractArea(anchor.text),
       image: anchor.images[0] || "",
@@ -664,7 +658,7 @@ async function scanListings() {
   const debugLog = [];
 
   for (const source of SOURCES) {
-    const urls = source.urls || DISTRICTS.map((district) => source.buildUrl(district));
+    const urls = source.urls || PROVINCES.map((p) => source.buildUrl(p));
     for (const url of urls) {
       try {
         debugLog.push(`[${source.id}] Scanning: ${url}`);
@@ -705,7 +699,7 @@ async function scanListings() {
         } else if (source.type === "nhatot") {
           sourcedListings = parseNhatot(body, source);
         } else {
-          const district = DISTRICTS.find((name) => url.includes(encodeURIComponent(name))) || "Hà Nội";
+          const district = PROVINCES.find((name) => url.includes(encodeURIComponent(name))) || "Khác";
           sourcedListings = parseRss(body, source, district);
         }
         
@@ -741,7 +735,7 @@ async function scanListings() {
   });
   
   debugLog.push(`[FILTER] After filter: ${listings.length} listings`);
-  debugLog.push(`[SOURCES] Mogi: ${listings.filter(l => l.sourceId === 'mogi-hanoi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat-hanoi').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot-hanoi').length}`);
+  debugLog.push(`[SOURCES] Mogi: ${listings.filter(l => l.sourceId === 'mogi').length}, Alonhadat: ${listings.filter(l => l.sourceId === 'alonhadat').length}, NhaTot: ${listings.filter(l => l.sourceId === 'nhatot').length}`);
 
   db.listings = listings.slice(0, 2000);
   db.runs = [
@@ -764,22 +758,23 @@ async function scanListings() {
 
 function filterListings(requestUrl) {
   const db = readDatabase();
-  const district = requestUrl.searchParams.get("district") || "";
+  const province = requestUrl.searchParams.get("province") || "";
   const query = (requestUrl.searchParams.get("q") || "").toLowerCase();
 
   let listings = db.listings;
-  if (district) listings = listings.filter((listing) => listing.district === district);
+  if (province) listings = listings.filter((listing) => listing.district === province);
   if (query) {
     listings = listings.filter((listing) => {
-      return `${listing.title} ${listing.summary} ${listing.price} ${listing.area}`.toLowerCase().includes(query);
+      return `${listing.title} ${listing.summary} ${listing.price} ${listing.area} ${listing.district}`.toLowerCase().includes(query);
     });
   }
 
+  const usedProvinces = [...new Set(db.listings.map((l) => l.district))].filter(Boolean).sort();
+
   return {
-    listings: listings.slice(0, 250),
+    listings: listings.slice(0, 500),
     total: listings.length,
-    districts: DISTRICTS,
-    districtLabels: Object.fromEntries(DISTRICT_VI),
+    provinces: usedProvinces,
     lastRun: db.runs[0] || null,
     debug: db.debug || []
   };
