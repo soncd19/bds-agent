@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tin chung c&#432; H&#224; N&#7897;i</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand-block">
+        <span class="brand-mark">BDS</span>
+        <strong>BDS Agent</strong>
+      </div>
+      <nav class="main-nav" aria-label="Menu ch&#237;nh">
+        <a href="#listings">Tin rao</a>
+        <a href="#mapSurface">B&#7843;n &#273;&#7891;</a>
+        <a href="#filters">B&#7897; l&#7885;c</a>
+      </nav>
+      <button id="scanNow" type="button">Qu&#233;t ngay</button>
+    </header>
+
+    <section class="hero" id="hero">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="eyebrow">D&#7919; li&#7879;u c&#7853;p nh&#7853;t m&#7895;i gi&#7901;</p>
+        <h1>Kh&#225;m ph&#225; chung c&#432; H&#224; N&#7897;i theo th&#7901;i gian th&#7921;c</h1>
+        <p class="hero-copy">T&#7893;ng h&#7907;p tin rao t&#7915; c&#225;c ngu&#7891;n b&#7845;t &#273;&#7897;ng s&#7843;n, h&#7895; tr&#7907; l&#7885;c nhanh theo khu v&#7921;c, gi&#225;, di&#7879;n t&#237;ch v&#224; b&#7843;n &#273;&#7891;.</p>
+        <div class="hero-actions">
+          <a class="hero-button" href="#listings">Xem tin rao</a>
+          <a class="hero-button secondary" href="#filters">L&#7885;c n&#226;ng cao</a>
+        </div>
+      </div>
+    </section>
+
+    <main>
+      <section class="searchbar" id="filters" aria-label="B&#7897; l&#7885;c t&#236;m ki&#7871;m">
+        <div class="search-row">
+          <label class="search-field wide">
+            T&#7915; kh&#243;a
+            <input id="searchInput" type="search" placeholder="VD: Vinhomes, 2 t&#7927;, 70m2">
+          </label>
+
+          <label class="search-field">
+            Qu&#7853;n / huy&#7879;n
+            <select id="districtFilter">
+              <option value="">T&#7845;t c&#7843; khu v&#7921;c</option>
+            </select>
+          </label>
+
+          <label class="search-field">
+            Kho&#7843;ng gi&#225;
+            <select id="priceFilter">
+              <option value="">T&#7845;t c&#7843; m&#7913;c gi&#225;</option>
+              <option value="0-3">D&#432;&#7899;i 3 t&#7927;</option>
+              <option value="3-5">3 - 5 t&#7927;</option>
+              <option value="5-7">5 - 7 t&#7927;</option>
+              <option value="7-10">7 - 10 t&#7927;</option>
+              <option value="10-999">Tr&#234;n 10 t&#7927;</option>
+            </select>
+          </label>
+
+          <label class="search-field">
+            Di&#7879;n t&#237;ch
+            <select id="areaFilter">
+              <option value="">T&#7845;t c&#7843; di&#7879;n t&#237;ch</option>
+              <option value="0-50">D&#432;&#7899;i 50 m&#178;</option>
+              <option value="50-80">50 - 80 m&#178;</option>
+              <option value="80-100">80 - 100 m&#178;</option>
+              <option value="100-999">Tr&#234;n 100 m&#178;</option>
+            </select>
+          </label>
+
+          <label class="search-field">
+            Ngu&#7891;n
+            <select id="sourceFilter">
+              <option value="">T&#7845;t c&#7843; ngu&#7891;n</option>
+            </select>
+          </label>
+
+          <label class="search-field">
+            Lo&#7841;i tin
+            <select id="propertyTypeFilter">
+              <option value="">T&#7845;t c&#7843; lo&#7841;i tin</option>
+              <option value="apartment">Chung c&#432;</option>
+              <option value="house_land">Nh&#224; &#273;&#7845;t</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="toolbar">
+          <div class="metric">
+            <span id="totalCount">0</span>
+            <small>tin &#273;ang hi&#7875;n th&#7883;</small>
+          </div>
+
+          <div class="view-toggle" role="group" aria-label="Ki&#7875;u hi&#7875;n th&#7883;">
+            <button class="toggle-button active" type="button" data-view="list">Danh s&#225;ch</button>
+            <button class="toggle-button" type="button" data-view="map">Xem b&#7843;n &#273;&#7891;</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-heading">
+        <div>
+          <p class="eyebrow">Danh s&#225;ch tin rao</p>
+          <h2>B&#7845;t &#273;&#7897;ng s&#7843;n ph&#249; h&#7907;p</h2>
+        </div>
+        <span class="status" id="status">&#272;ang t&#7843;i d&#7919; li&#7879;u...</span>
+      </section>
+
+      <section class="results-layout" id="resultsLayout">
+        <section>
+          <section class="listings" id="listings" aria-live="polite"></section>
+          <nav class="pagination" id="pagination" aria-label="Ph&#226;n trang"></nav>
+        </section>
+        <aside class="map-panel" aria-label="B&#7843;n &#273;&#7891; tin &#273;&#259;ng">
+          <div class="map-surface" id="mapSurface"></div>
+        </aside>
+      </section>
+    </main>
+
+    <div class="modal-backdrop" id="listingModal" aria-hidden="true">
+      <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" id="modalClose" type="button" aria-label="&#272;&#243;ng">x</button>
+        <div class="modal-body" id="modalBody"></div>
+      </article>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

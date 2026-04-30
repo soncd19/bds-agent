@@ -1,0 +1,13 @@
+{
+  "name": "hanoi-apartment-listings",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hourly Hanoi apartment sale listing scanner and dashboard.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
